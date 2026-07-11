@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  password      String
+  avatar        String?
+  role          String    @default("student")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  progress      Progress[]
+  results       Result[]
+  comments      Comment[]
+  reviews       Review[]
+
+  @@map("users")
+}
+
+model Course {
+  id              String    @id @default(uuid())
+  title           String
+  description     String
+  descriptionLong String    @default("")
+  thumbnail       String?
+  banner          String?
+  category        String
+  difficulty      String    @default("beginner")
+  language        String    @default("ar")
+  duration        String
+  instructorName  String    @default("")
+  instructorBio   String    @default("")
+  instructorAvatar String?
+  tags            String    @default("[]")
+  isFree          Boolean   @default(true)
+  isPublished     Boolean   @default(false)
+  isFeatured      Boolean   @default(false)
+  sortOrder       Int       @default(0)
+  commentsEnabled Boolean   @default(true)
+  reviewsEnabled  Boolean   @default(true)
+  averageRating   Float     @default(0)
+  studentCount    Int       @default(0)
+  xpPoints        Int       @default(0)
+  certificateEnabled Boolean @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  lessons         Lesson[]
+  sections        Section[]
+  comments        Comment[]
+  reviews         Review[]
+
+  @@map("courses")
+}
+
+model Section {
+  id          String    @id @default(uuid())
+  title       String
+  description String    @default("")
+  order       Int
+  courseId     String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons     Lesson[]
+
+  @@map("sections")
+}
+
+model Lesson {
+  id            String    @id @default(uuid())
+  title         String
+  content       String    @default("")
+  contentType   String    @default("text")
+  videoUrl      String    @default("")
+  fileUrl       String    @default("")
+  fileType      String    @default("")
+  externalUrl   String    @default("")
+  codeContent   String    @default("")
+  codeLanguage  String    @default("")
+  order         Int
+  duration      String    @default("")
+  isPreview     Boolean   @default(false)
+  courseId       String
+  sectionId     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  course        Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  section       Section?  @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  quiz          Quiz?
+  progress      Progress[]
+
+  @@map("lessons")
+}
+
+model Quiz {
+  id            String    @id @default(uuid())
+  title         String
+  passingScore  Int       @default(70)
+  lessonId      String    @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  lesson        Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  questions     Question[]
+  results       Result[]
+
+  @@map("quizzes")
+}
+
+model Question {
+  id            String    @id @default(uuid())
+  text          String
+  options       String
+  correctAnswer Int
+  quizId        String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  quiz          Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@map("questions")
+}
+
+model Progress {
+  id            String    @id @default(uuid())
+  userId        String
+  lessonId      String
+  completed     Boolean   @default(false)
+  lastAccessed  DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson        Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@map("progress")
+}
+
+model Result {
+  id            String    @id @default(uuid())
+  userId        String
+  quizId        String
+  score         Int
+  answers       String
+  passed        Boolean
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz          Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@map("results")
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  userId    String
+  courseId   String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String
+  courseId   String
+  rating    Int
+  content   String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@map("reviews")
+}
