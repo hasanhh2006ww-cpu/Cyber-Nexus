@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Navbar } from "@/components/layout/navbar";
 import { Sidebar } from "@/components/layout/sidebar";
+import { handleSessionExpired } from "@/lib/auth-client";
 
 interface Question {
   id: string;
@@ -57,6 +58,11 @@ export default function QuizPage() {
           `/api/courses/${params.id}/lessons/${params.lessonId}/quiz`
         );
 
+        if (res.status === 401) {
+          const data = await res.json().catch(() => ({}));
+          if (handleSessionExpired(data)) return;
+        }
+
         if (!res.ok) {
           router.push(`/courses/${params.id}/lesson/${params.lessonId}`);
           return;
@@ -64,8 +70,7 @@ export default function QuizPage() {
 
         const data = await res.json();
         setQuiz(data);
-      } catch (error) {
-        console.error("Failed to fetch quiz:", error);
+      } catch {
         router.push(`/courses/${params.id}/lesson/${params.lessonId}`);
       } finally {
         setLoading(false);
@@ -99,6 +104,11 @@ export default function QuizPage() {
           answers: answersArray,
         }),
       });
+
+      if (res.status === 401) {
+        const data = await res.json().catch(() => ({}));
+        if (handleSessionExpired(data)) return;
+      }
 
       if (res.ok) {
         const data = await res.json();

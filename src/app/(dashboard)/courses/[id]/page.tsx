@@ -1,21 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Clock, CheckCircle, Play, Shield, Globe, Award,
   FileText, Video, Link as LinkIcon, Code, Image, Archive,
   FolderOpen, ExternalLink, FileDown, ChevronDown, ChevronUp,
+  Lock, LogIn, GraduationCap, Star, Users, LogOut,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+  DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
 import { Navbar } from "@/components/layout/navbar";
 import { Sidebar } from "@/components/layout/sidebar";
+import { toast } from "sonner";
+import { handleSessionExpired } from "@/lib/auth-client";
 
 interface CourseLesson {
   id: string; title: string; contentType: string; duration: string;
@@ -57,10 +64,35 @@ export default function CourseDetailPage() {
   const router = useRouter();
   const [course, setCourse] = useState<CourseDetail | null>(null);
   const [userProgress, setUserProgress] = useState<UserProgress[]>([]);
+  const [enrolled, setEnrolled] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+  const [enrolling, setEnrolling] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
+  const fetchEnrollment = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/enrollments?courseId=${params.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (handleSessionExpired(data)) return;
+        setEnrolled(data.enrolled);
+      } else if (res.status === 401) {
+        const data = await res.json().catch(() => ({}));
+        if (handleSessionExpired(data)) return;
+        setEnrolled(false);
+      } else {
+        setEnrolled(false);
+      }
+    } catch {
+      setEnrolled(false);
+    }
+  }, [params.id]);
+
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchData() {
       try {
         const [courseRes, progressRes] = await Promise.all([
@@ -71,7 +103,18 @@ export default function CourseDetailPage() {
         if (!courseRes.ok) { router.push("/courses"); return; }
 
         const courseData = await courseRes.json();
-        const progressData = await progressRes.json();
+
+        let progressData: UserProgress[] = [];
+        if (progressRes.ok) {
+          const raw = await progressRes.json();
+          if (handleSessionExpired(raw)) return;
+          progressData = raw;
+        } else if (progressRes.status === 401) {
+          const raw = await progressRes.json().catch(() => ({}));
+          if (handleSessionExpired(raw)) return;
+        }
+
+        if (cancelled) return;
 
         setCourse(courseData);
         setUserProgress(progressData);
@@ -79,15 +122,18 @@ export default function CourseDetailPage() {
         if (courseData.sections?.length > 0) {
           setExpandedSections(new Set(courseData.sections.map((s: CourseSection) => s.id)));
         }
-      } catch (error) {
-        console.error("Failed to fetch course:", error);
-        router.push("/courses");
+
+        await fetchEnrollment();
+    } catch {
+      if (!cancelled) router.push("/courses");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     fetchData();
-  }, [params.id, router]);
+
+    return () => { cancelled = true; };
+  }, [params.id, router, fetchEnrollment]);
 
   const allLessons = course
     ? [...(course.sections || []).flatMap((s) => s.lessons), ...(course.lessons || [])]
@@ -111,7 +157,66 @@ export default function CourseDetailPage() {
     });
   };
 
-  if (loading) {
+  const handleEnroll = async () => {
+    setEnrolling(true);
+    try {
+      const res = await fetch("/api/enrollments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseId: params.id }),
+      });
+
+      const data = await res.json();
+      if (handleSessionExpired(data)) return;
+
+      if (res.ok && data.enrolled) {
+        setEnrolled(true);
+        setEnrolling(false);
+        toast.success("تم الانضمام بنجاح!", { description: "يمكنك الآن الوصول إلى جميع دروس الدورة" });
+
+        const firstLesson = allLessons[0];
+        if (firstLesson) {
+          router.push(`/courses/${params.id}/lesson/${firstLesson.id}`);
+        }
+        return;
+      }
+
+      toast.error(data.error || "فشل الانضمام إلى الدورة");
+    } catch {
+      toast.error("حدث خطأ أثناء الاتصال بالخادم");
+    } finally {
+      setEnrolling(false);
+    }
+  };
+
+  const handleLeave = async () => {
+    setLeaving(true);
+    try {
+      const res = await fetch("/api/enrollments", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseId: params.id }),
+      });
+
+      const data = await res.json();
+      if (handleSessionExpired(data)) return;
+
+      if (res.ok && data.success) {
+        setEnrolled(false);
+        setUserProgress([]);
+        setShowLeaveDialog(false);
+        toast.success("تم مغادرة الدورة بنجاح");
+      } else {
+        toast.error(data.error || "فشل مغادرة الدورة");
+      }
+    } catch {
+      toast.error("حدث خطأ أثناء الاتصال بالخادم");
+    } finally {
+      setLeaving(false);
+    }
+  };
+
+  if (loading || enrolled === null) {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
@@ -175,17 +280,19 @@ export default function CourseDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Main Content */}
               <div className="lg:col-span-2 space-y-6">
-                {/* Progress */}
-                <Card className="border-[var(--border)] bg-[var(--card)]">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold">تقدمك في الدورة</h3>
-                      <span className="text-sm text-[var(--muted-foreground)]">{completedCount}/{totalLessons} درس مكتمل</span>
-                    </div>
-                    <Progress value={progressPercent} className="h-3" />
-                    <p className="text-xs text-[var(--muted-foreground)] mt-2">{progressPercent}% مكتمل</p>
-                  </CardContent>
-                </Card>
+                {/* Progress (only when enrolled) */}
+                {enrolled && totalLessons > 0 && (
+                  <Card className="border-[var(--border)] bg-[var(--card)]">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-semibold">تقدمك في الدورة</h3>
+                        <span className="text-sm text-[var(--muted-foreground)]">{completedCount}/{totalLessons} درس مكتمل</span>
+                      </div>
+                      <Progress value={progressPercent} className="h-3" />
+                      <p className="text-xs text-[var(--muted-foreground)] mt-2">{progressPercent}% مكتمل</p>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* About */}
                 <Card className="border-[var(--border)] bg-[var(--card)]">
@@ -233,28 +340,49 @@ export default function CourseDetailPage() {
                             </div>
                             {isExpanded ? <ChevronUp className="h-4 w-4 text-[var(--muted-foreground)]" /> : <ChevronDown className="h-4 w-4 text-[var(--muted-foreground)]" />}
                           </button>
-                          {isExpanded && (
-                            <div className="divide-y divide-[var(--border)]">
-                              {section.lessons.map((lesson) => {
-                                const Icon = ICON_MAP[lesson.contentType] || FileText;
-                                const isCompleted = userProgress.some((p) => p.lessonId === lesson.id && p.completed);
-                                return (
-                                  <Link key={lesson.id} href={`/courses/${course.id}/lesson/${lesson.id}`}>
-                                    <div className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--secondary)]/30 transition-colors cursor-pointer">
-                                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                                        isCompleted ? "bg-[var(--success)]/10 text-[var(--success)]" : "bg-[var(--secondary)] text-[var(--muted-foreground)]"
-                                      }`}>
-                                        {isCompleted ? <CheckCircle className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
-                                      </div>
-                                      <span className="text-sm text-[var(--foreground)] flex-1">{lesson.title}</span>
-                                      {lesson.duration && <span className="text-xs text-[var(--muted-foreground)]">{lesson.duration}</span>}
-                                      {lesson.isPreview && <Badge variant="success" className="text-xs">معاينة</Badge>}
-                                    </div>
-                                  </Link>
-                                );
-                              })}
-                            </div>
-                          )}
+                          <AnimatePresence>
+                            {isExpanded && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="divide-y divide-[var(--border)]">
+                                  {section.lessons.map((lesson) => {
+                                    const Icon = ICON_MAP[lesson.contentType] || FileText;
+                                    const isCompleted = userProgress.some((p) => p.lessonId === lesson.id && p.completed);
+                                    const isLocked = !enrolled && !lesson.isPreview;
+
+                                    return (
+                                      <Link
+                                        key={lesson.id}
+                                        href={isLocked ? "#" : `/courses/${course.id}/lesson/${lesson.id}`}
+                                        onClick={(e) => { if (isLocked) e.preventDefault(); }}
+                                      >
+                                        <div className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                                          isLocked ? "opacity-50 cursor-not-allowed" : "hover:bg-[var(--secondary)]/30 cursor-pointer"
+                                        }`}>
+                                          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                                            isCompleted ? "bg-[var(--success)]/10 text-[var(--success)]"
+                                            : isLocked ? "bg-[var(--muted)]/10 text-[var(--muted-foreground)]"
+                                            : "bg-[var(--secondary)] text-[var(--muted-foreground)]"
+                                          }`}>
+                                            {isCompleted ? <CheckCircle className="h-4 w-4" /> : isLocked ? <Lock className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                                          </div>
+                                          <span className="text-sm text-[var(--foreground)] flex-1">{lesson.title}</span>
+                                          {lesson.duration && <span className="text-xs text-[var(--muted-foreground)]">{lesson.duration}</span>}
+                                          {lesson.isPreview && <Badge variant="success" className="text-xs">معاينة</Badge>}
+                                          {isLocked && <Lock className="h-3 w-3 text-[var(--muted-foreground)]" />}
+                                        </div>
+                                      </Link>
+                                    );
+                                  })}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
                       );
                     })}
@@ -269,16 +397,27 @@ export default function CourseDetailPage() {
                           {course.lessons.map((lesson) => {
                             const Icon = ICON_MAP[lesson.contentType] || FileText;
                             const isCompleted = userProgress.some((p) => p.lessonId === lesson.id && p.completed);
+                            const isLocked = !enrolled && !lesson.isPreview;
+
                             return (
-                              <Link key={lesson.id} href={`/courses/${course.id}/lesson/${lesson.id}`}>
-                                <div className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--secondary)]/30 transition-colors cursor-pointer">
+                              <Link
+                                key={lesson.id}
+                                href={isLocked ? "#" : `/courses/${course.id}/lesson/${lesson.id}`}
+                                onClick={(e) => { if (isLocked) e.preventDefault(); }}
+                              >
+                                <div className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                                  isLocked ? "opacity-50 cursor-not-allowed" : "hover:bg-[var(--secondary)]/30 cursor-pointer"
+                                }`}>
                                   <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                                    isCompleted ? "bg-[var(--success)]/10 text-[var(--success)]" : "bg-[var(--secondary)] text-[var(--muted-foreground)]"
+                                    isCompleted ? "bg-[var(--success)]/10 text-[var(--success)]"
+                                    : isLocked ? "bg-[var(--muted)]/10 text-[var(--muted-foreground)]"
+                                    : "bg-[var(--secondary)] text-[var(--muted-foreground)]"
                                   }`}>
-                                    {isCompleted ? <CheckCircle className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                                    {isCompleted ? <CheckCircle className="h-4 w-4" /> : isLocked ? <Lock className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
                                   </div>
                                   <span className="text-sm text-[var(--foreground)] flex-1">{lesson.title}</span>
                                   {lesson.duration && <span className="text-xs text-[var(--muted-foreground)]">{lesson.duration}</span>}
+                                  {isLocked && <Lock className="h-3 w-3 text-[var(--muted-foreground)]" />}
                                 </div>
                               </Link>
                             );
@@ -296,12 +435,70 @@ export default function CourseDetailPage() {
 
               {/* Sidebar */}
               <div className="space-y-6">
+                {/* Enrollment Card */}
                 <Card className="border-[var(--border)] bg-[var(--card)] sticky top-6">
                   <CardContent className="p-6 space-y-4">
-                    <div className="text-center">
-                      <p className="text-3xl font-bold text-[var(--primary)]">{course.isFree ? "مجانية" : "مدفوعة"}</p>
-                    </div>
+                    {enrolled ? (
+                      <div className="text-center space-y-3">
+                        <div className="flex items-center justify-center gap-2 text-[var(--success)]">
+                          <GraduationCap className="h-5 w-5" />
+                          <span className="font-semibold">أنت مسجل في هذه الدورة</span>
+                        </div>
+                        {totalLessons > 0 && (
+                          <>
+                            <Progress value={progressPercent} className="h-2" />
+                            <p className="text-xs text-[var(--muted-foreground)]">{progressPercent}% مكتمل</p>
+                          </>
+                        )}
+                        {(() => {
+                          const nextLesson = allLessons.find((l) =>
+                            !userProgress.some((p) => p.lessonId === l.id && p.completed)
+                          );
+                          if (nextLesson) {
+                            return (
+                              <Link href={`/courses/${params.id}/lesson/${nextLesson.id}`} className="w-full">
+                                <Button className="w-full bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white">
+                                  <Play className="ml-2 h-4 w-4" /> متابعة التعلم
+                                </Button>
+                              </Link>
+                            );
+                          }
+                          return (
+                            <Badge variant="success" className="w-full justify-center py-2 text-sm">
+                              <CheckCircle className="ml-1 h-4 w-4" /> الدورة مكتملة
+                            </Badge>
+                          );
+                        })()}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-red-400/70 hover:text-red-400 hover:bg-red-400/10 w-full"
+                          onClick={() => setShowLeaveDialog(true)}
+                        >
+                          <LogOut className="ml-1 h-3 w-3" /> مغادرة الدورة
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="text-center space-y-3">
+                        <p className="text-2xl font-bold text-[var(--primary)]">{course.isFree ? "مجانية" : "مدفوعة"}</p>
+                        <Button
+                          className="w-full bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white"
+                          onClick={handleEnroll}
+                          disabled={enrolling}
+                        >
+                          {enrolling ? (
+                            <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full ml-2" />
+                          ) : (
+                            <LogIn className="ml-2 h-4 w-4" />
+                          )}
+                          {enrolling ? "جاري الانضمام..." : "الانضمام إلى الدورة"}
+                        </Button>
+                        <p className="text-xs text-[var(--muted-foreground)]">افتح جميع الدروس والمحتوى</p>
+                      </div>
+                    )}
+
                     <Separator className="bg-[var(--border)]" />
+
                     <div className="space-y-3 text-sm">
                       <div className="flex items-center justify-between">
                         <span className="text-[var(--muted-foreground)]">المدة</span>
@@ -322,6 +519,22 @@ export default function CourseDetailPage() {
                       <div className="flex items-center justify-between">
                         <span className="text-[var(--muted-foreground)]">اللغة</span>
                         <span className="text-[var(--foreground)]">{LANG_MAP[course.language]}</span>
+                      </div>
+                      {course.averageRating > 0 && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[var(--muted-foreground)]">التقييم</span>
+                          <span className="text-[var(--foreground)] flex items-center gap-1">
+                            <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
+                            {course.averageRating.toFixed(1)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="text-[var(--muted-foreground)]">الطلاب</span>
+                        <span className="text-[var(--foreground)] flex items-center gap-1">
+                          <Users className="h-3 w-3" />
+                          {course.studentCount}
+                        </span>
                       </div>
                       {course.xpPoints > 0 && (
                         <div className="flex items-center justify-between">
@@ -361,6 +574,37 @@ export default function CourseDetailPage() {
           </div>
         </main>
       </div>
+
+      <Dialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>هل أنت متأكد من مغادرة هذه الدورة؟</DialogTitle>
+            <DialogDescription>
+              سيتم حذف تسجيلك في هذه الدورة وجميع تقدمك المرتبط بها (الدروس المكتملة ونتائج الاختبارات).
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowLeaveDialog(false)}
+              disabled={leaving}
+              className="border-[var(--border)]"
+            >
+              إلغاء
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleLeave}
+              disabled={leaving}
+            >
+              {leaving ? (
+                <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full ml-2" />
+              ) : null}
+              {leaving ? "جاري المغادرة..." : "نعم، مغادرة الدورة"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

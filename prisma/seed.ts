@@ -238,13 +238,16 @@ async function main() {
     const { lessons: lessonsData, ...courseInfo } = courseData;
     const course = await prisma.course.create({ data: courseInfo });
 
+    let lessonIndex = 0;
     for (const lessonData of lessonsData) {
       const lesson = await prisma.lesson.create({
         data: {
           ...lessonData,
+          isPreview: lessonIndex === 0,
           courseId: course.id,
         },
       });
+      lessonIndex++;
       totalLessons++;
 
       const quiz = await prisma.quiz.create({

@@ -18,6 +18,7 @@ import { Progress } from "@/components/ui/progress";
 import { Avatar } from "@/components/ui/avatar";
 import { Navbar } from "@/components/layout/navbar";
 import { Sidebar } from "@/components/layout/sidebar";
+import { handleSessionExpired } from "@/lib/auth-client";
 
 interface ProfileStats {
   completedLessons: number;
@@ -54,8 +55,17 @@ export default function ProfilePage() {
           fetch("/api/results"),
         ]);
 
-        const progress = await progressRes.json();
-        const results = await resultsRes.json();
+        if (progressRes.status === 401) {
+          const data = await progressRes.json().catch(() => ({}));
+          if (handleSessionExpired(data)) return;
+        }
+        if (resultsRes.status === 401) {
+          const data = await resultsRes.json().catch(() => ({}));
+          if (handleSessionExpired(data)) return;
+        }
+
+        const progress = progressRes.ok ? await progressRes.json() : [];
+        const results = resultsRes.ok ? await resultsRes.json() : [];
 
         const completedLessons = progress.filter(
           (p: { completed: boolean }) => p.completed

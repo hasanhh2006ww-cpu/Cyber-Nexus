@@ -6,13 +6,15 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, ArrowRight, CheckCircle, Clock, FileText,
-  ExternalLink, Download, Play, Code,
+  ExternalLink, Download, Play, Code, Lock, LogIn,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Navbar } from "@/components/layout/navbar";
 import { Sidebar } from "@/components/layout/sidebar";
+import { toast } from "sonner";
+import { handleSessionExpired } from "@/lib/auth-client";
 
 interface LessonCourse {
   id: string;
@@ -216,30 +218,77 @@ function getFlatLessons(course: LessonCourse) {
   return lessons;
 }
 
+type LessonState = "loading" | "not_enrolled" | "error" | "ready";
+
 export default function LessonPage() {
   const params = useParams();
   const router = useRouter();
   const [lesson, setLesson] = useState<LessonDetail | null>(null);
   const [completed, setCompleted] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [state, setState] = useState<LessonState>("loading");
   const [marking, setMarking] = useState(false);
+  const [enrolling, setEnrolling] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const fetchLesson = useCallback(async () => {
     try {
       const res = await fetch(`/api/courses/${params.id}/lessons/${params.lessonId}`);
-      if (!res.ok) { router.push(`/courses/${params.id}`); return; }
+
+      if (res.status === 403) {
+        setState("not_enrolled");
+        return;
+      }
+
+      if (res.status === 401) {
+        const data = await res.json().catch(() => ({}));
+        if (handleSessionExpired(data)) return;
+        router.push("/login");
+        return;
+      }
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: "Unknown error" }));
+        setErrorMsg(errData.error || "حدث خطأ في تحميل الدرس");
+        setState("error");
+        return;
+      }
+
       const data = await res.json();
       setLesson(data.lesson);
       setCompleted(data.completed);
-    } catch (error) {
-      console.error("Failed to fetch lesson:", error);
-      router.push(`/courses/${params.id}`);
-    } finally {
-      setLoading(false);
+      setState("ready");
+    } catch {
+      setErrorMsg("حدث خطأ في الاتصال بالخادم");
+      setState("error");
     }
   }, [params.id, params.lessonId, router]);
 
   useEffect(() => { fetchLesson(); }, [fetchLesson]);
+
+  const handleEnroll = async () => {
+    setEnrolling(true);
+    try {
+      const res = await fetch("/api/enrollments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseId: params.id }),
+      });
+
+      const data = await res.json();
+      if (handleSessionExpired(data)) return;
+
+      if (res.ok && data.enrolled) {
+        toast.success("تم الانضمام بنجاح!");
+        await fetchLesson();
+      } else {
+        toast.error(data.error || "فشل الانضمام إلى الدورة");
+      }
+    } catch {
+      toast.error("حدث خطأ أثناء الاتصال بالخادم");
+    } finally {
+      setEnrolling(false);
+    }
+  };
 
   const handleToggleComplete = async () => {
     if (!lesson) return;
@@ -253,15 +302,18 @@ export default function LessonPage() {
       });
       if (res.ok) {
         setCompleted(newCompleted);
+      } else if (res.status === 401) {
+        const data = await res.json().catch(() => ({}));
+        handleSessionExpired(data);
       }
-    } catch (error) {
-      console.error("Failed to toggle lesson progress:", error);
+    } catch {
+      // ignore
     } finally {
       setMarking(false);
     }
   };
 
-  if (loading) {
+  if (state === "loading") {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
@@ -272,6 +324,70 @@ export default function LessonPage() {
               <div className="h-8 w-48 bg-[var(--secondary)] rounded" />
               <div className="h-96 bg-[var(--secondary)] rounded-[var(--radius)]" />
             </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === "error") {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <div className="flex flex-1">
+          <Sidebar />
+          <main className="flex-1 p-6 lg:p-8 overflow-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-2xl mx-auto text-center py-20"
+            >
+              <h1 className="text-2xl font-bold text-[var(--foreground)] mb-3">خطأ</h1>
+              <p className="text-[var(--muted-foreground)] mb-8">{errorMsg}</p>
+              <Button variant="outline" className="border-[var(--border)]" onClick={() => router.push(`/courses/${params.id}`)}>
+                العودة للدورة
+              </Button>
+            </motion.div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === "not_enrolled") {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <div className="flex flex-1">
+          <Sidebar />
+          <main className="flex-1 p-6 lg:p-8 overflow-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="max-w-2xl mx-auto text-center py-20"
+            >
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[var(--muted)]/10 flex items-center justify-center">
+                <Lock className="h-10 w-10 text-[var(--muted-foreground)]" />
+              </div>
+              <h1 className="text-2xl font-bold text-[var(--foreground)] mb-3">محتوى مقفل</h1>
+              <p className="text-[var(--muted-foreground)] mb-8 max-w-md mx-auto">
+                يجب عليك التسجيل في هذه الدورة أولًا للوصول إلى هذا المحتوى
+              </p>
+              <div className="flex items-center justify-center gap-4">
+                <Button className="bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white" onClick={handleEnroll} disabled={enrolling}>
+                  {enrolling ? (
+                    <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full ml-2" />
+                  ) : (
+                    <LogIn className="ml-2 h-4 w-4" />
+                  )}
+                  {enrolling ? "جاري الانضمام..." : "الانضمام إلى الدورة"}
+                </Button>
+                <Link href={`/courses/${params.id}`}>
+                  <Button variant="outline" className="border-[var(--border)]">العودة للدورة</Button>
+                </Link>
+              </div>
+            </motion.div>
           </main>
         </div>
       </div>

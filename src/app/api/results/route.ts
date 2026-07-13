@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { requireAuth } from "@/lib/session";
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAuth(req);
+    if ("response" in auth) return auth.response;
+    const user = auth.user;
 
     const { quizId, answers } = await req.json();
 
@@ -20,14 +19,24 @@ export async function POST(req: NextRequest) {
 
     const quiz = await prisma.quiz.findUnique({
       where: { id: quizId },
-      include: { questions: true },
+      include: { questions: true, lesson: { select: { courseId: true } } },
     });
 
     if (!quiz) {
-      return NextResponse.json(
-        { error: "Quiz not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Quiz not found" }, { status: 404 });
+    }
+
+    const courseId = quiz.lesson?.courseId;
+    if (courseId) {
+      const enrollmentRows = await prisma.$queryRawUnsafe(
+        "SELECT id FROM enrollments WHERE userId = ? AND courseId = ? LIMIT 1",
+        user.id,
+        courseId
+      ) as Array<{ id: string }>;
+
+      if (!Array.isArray(enrollmentRows) || enrollmentRows.length === 0) {
+        return NextResponse.json({ error: "NOT_ENROLLED" }, { status: 403 });
+      }
     }
 
     let correct = 0;
@@ -48,7 +57,7 @@ export async function POST(req: NextRequest) {
 
     const result = await prisma.result.create({
       data: {
-        userId: session.user.id,
+        userId: user.id,
         quizId,
         score,
         answers: JSON.stringify(answers),
@@ -56,51 +65,38 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({
-      result,
-      score,
-      total,
-      correct,
-      passed,
-    });
-  } catch {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ result, score, total, correct, passed });
+  } catch (error) {
+    console.error("[RESULTS POST] ERROR:", error instanceof Error ? error.message : error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAuth(req);
+    if ("response" in auth) return auth.response;
+    const user = auth.user;
 
     const { searchParams } = new URL(req.url);
     const quizId = searchParams.get("quizId");
 
     const results = await prisma.result.findMany({
       where: {
-        userId: session.user.id,
+        userId: user.id,
         ...(quizId ? { quizId } : {}),
       },
       include: {
         quiz: {
-          include: {
-            lesson: true,
-          },
+          include: { lesson: true },
         },
       },
       orderBy: { createdAt: "desc" },
     });
 
     return NextResponse.json(results);
-  } catch {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+  } catch (error) {
+    console.error("[RESULTS GET] ERROR:", error instanceof Error ? error.message : error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

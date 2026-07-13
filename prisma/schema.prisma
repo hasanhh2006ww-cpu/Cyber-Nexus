@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model User {
@@ -13,6 +13,7 @@ model User {
   password      String
   avatar        String?
   role          String    @default("student")
+  preferences   String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -20,6 +21,7 @@ model User {
   results       Result[]
   comments      Comment[]
   reviews       Review[]
+  enrollments   Enrollment[]
 
   @@map("users")
 }
@@ -56,6 +58,8 @@ model Course {
   sections        Section[]
   comments        Comment[]
   reviews         Review[]
+  enrollments     Enrollment[]
+  learningPaths   LearningPathCourse[]
 
   @@map("courses")
 }
@@ -191,4 +195,51 @@ model Review {
 
   @@unique([userId, courseId])
   @@map("reviews")
+}
+
+model LearningPath {
+  id              String    @id @default(uuid())
+  title           String
+  slug            String    @unique
+  description     String    @default("")
+  descriptionLong String    @default("")
+  thumbnail       String?
+  banner          String?
+  difficulty      String    @default("beginner")
+  estimatedHours  Int       @default(0)
+  isPublished     Boolean   @default(false)
+  isFeatured      Boolean   @default(false)
+  sortOrder       Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  courses         LearningPathCourse[]
+
+  @@map("learning_paths")
+}
+
+model LearningPathCourse {
+  id             String      @id @default(uuid())
+  learningPathId String
+  courseId        String
+  order          Int         @default(0)
+
+  learningPath   LearningPath @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  course         Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([learningPathId, courseId])
+  @@map("learning_path_courses")
+}
+
+model Enrollment {
+  id        String   @id @default(uuid())
+  userId    String
+  courseId   String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@map("enrollments")
 }
