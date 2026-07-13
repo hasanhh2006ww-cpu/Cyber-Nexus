@@ -28,13 +28,12 @@ export async function POST(req: NextRequest) {
 
     const courseId = quiz.lesson?.courseId;
     if (courseId) {
-      const enrollmentRows = await prisma.$queryRawUnsafe(
-        "SELECT id FROM enrollments WHERE userId = ? AND courseId = ? LIMIT 1",
-        user.id,
-        courseId
-      ) as Array<{ id: string }>;
+      const enrollment = await prisma.enrollment.findFirst({
+        where: { userId: user.id, courseId },
+        select: { id: true },
+      });
 
-      if (!Array.isArray(enrollmentRows) || enrollmentRows.length === 0) {
+      if (!enrollment) {
         return NextResponse.json({ error: "NOT_ENROLLED" }, { status: 403 });
       }
     }

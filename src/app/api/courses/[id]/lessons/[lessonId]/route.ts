@@ -53,27 +53,22 @@ export async function GET(
     }
 
     if (!lesson.isPreview) {
-      const enrollmentRows = await prisma.$queryRawUnsafe(
-        "SELECT id FROM enrollments WHERE userId = ? AND courseId = ? LIMIT 1",
-        user.id,
-        id
-      ) as Array<{ id: string }>;
+      const enrollment = await prisma.enrollment.findFirst({
+        where: { userId: user.id, courseId: id },
+        select: { id: true },
+      });
 
-      if (!Array.isArray(enrollmentRows) || enrollmentRows.length === 0) {
+      if (!enrollment) {
         return NextResponse.json({ error: "NOT_ENROLLED" }, { status: 403 });
       }
     }
 
-    let completed = false;
-    const progressRows = await prisma.$queryRawUnsafe(
-      "SELECT completed FROM progress WHERE userId = ? AND lessonId = ? LIMIT 1",
-      user.id,
-      lessonId
-    ) as Array<{ completed: boolean }>;
+    const progressRow = await prisma.progress.findUnique({
+      where: { userId_lessonId: { userId: user.id, lessonId } },
+      select: { completed: true },
+    });
 
-    if (Array.isArray(progressRows) && progressRows.length > 0) {
-      completed = !!progressRows[0].completed;
-    }
+    const completed = !!progressRow?.completed;
 
     return NextResponse.json({ lesson, completed });
   } catch (error) {
