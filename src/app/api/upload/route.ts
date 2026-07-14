@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { writeFile, mkdir } from "fs/promises"
-import path from "path"
+import { put } from "@vercel/blob"
 import { v4 as uuidv4 } from "uuid"
-import { existsSync } from "fs"
-
-export const runtime = "nodejs"
 
 const MAX_SIZE = 50 * 1024 * 1024
 const ALLOWED_TYPES: Record<string, string> = {
@@ -33,16 +29,13 @@ export async function POST(req: NextRequest) {
 
     const ext = ALLOWED_TYPES[file.type] || file.name.split(".").pop() || "bin"
     const filename = `${uuidv4()}.${ext}`
-    const uploadDir = path.join(process.cwd(), "public", "uploads")
 
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true })
-    }
+    const blob = await put(filename, file, {
+      access: "public",
+      contentType: file.type || undefined,
+    })
 
-    const buffer = Buffer.from(await file.arrayBuffer())
-    await writeFile(path.join(uploadDir, filename), buffer)
-
-    return NextResponse.json({ url: `/uploads/${filename}`, filename })
+    return NextResponse.json({ url: blob.url, filename })
   } catch (error) {
     console.error("Upload error:", error)
     return NextResponse.json({ error: "Upload failed" }, { status: 500 })
