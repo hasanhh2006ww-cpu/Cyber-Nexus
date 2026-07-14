@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, User, Settings } from "lucide-react";
+import { LayoutDashboard, BookOpen, Route, User, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard },
   { href: "/courses", label: "الدورات", icon: BookOpen },
+  { href: "/learning-paths", label: "مسارات الأمن السيبراني", icon: Route },
   { href: "/profile", label: "الملف الشخصي", icon: User },
   { href: "/settings", label: "الإعدادات", icon: Settings },
 ];

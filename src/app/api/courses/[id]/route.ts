@@ -32,6 +32,13 @@ export async function GET(
             externalUrl: true, codeLanguage: true,
           },
         },
+        learningPaths: {
+          include: {
+            learningPath: {
+              select: { id: true, title: true, slug: true, description: true, difficulty: true, thumbnail: true },
+            },
+          },
+        },
       },
     });
 

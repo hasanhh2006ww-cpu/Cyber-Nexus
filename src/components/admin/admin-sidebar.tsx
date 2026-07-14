@@ -6,6 +6,7 @@ import {
   Shield,
   LayoutDashboard,
   BookOpen,
+  Route,
   Users,
   BarChart3,
   Settings,
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils"
 const links = [
   { href: "/admin", label: "لوحة التحكم", icon: LayoutDashboard },
   { href: "/admin/courses", label: "الدورات", icon: BookOpen },
+  { href: "/admin/learning-paths", label: "مسارات الأمن السيبراني", icon: Route },
   { href: "/admin/users", label: "المستخدمون", icon: Users },
   { href: "/admin/statistics", label: "الإحصائيات", icon: BarChart3 },
   { href: "/admin/settings", label: "الإعدادات", icon: Settings },

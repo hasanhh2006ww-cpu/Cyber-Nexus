@@ -58,6 +58,8 @@ export default function AdminLearningPathEditPage() {
     isPublished: false,
     isFeatured: false,
     sortOrder: 0,
+    metaTitle: "",
+    metaDescription: "",
   })
   const [pathCourses, setPathCourses] = useState<PathCourse[]>([])
   const [addCourseDialogOpen, setAddCourseDialogOpen] = useState(false)
@@ -84,6 +86,7 @@ export default function AdminLearningPathEditPage() {
               banner: data.banner || "", difficulty: data.difficulty,
               estimatedHours: data.estimatedHours, isPublished: data.isPublished,
               isFeatured: data.isFeatured, sortOrder: data.sortOrder || 0,
+              metaTitle: data.metaTitle || "", metaDescription: data.metaDescription || "",
             })
             setPathCourses(data.courses || [])
           }
@@ -279,6 +282,20 @@ export default function AdminLearningPathEditPage() {
                   <Switch checked={form.isFeatured} onCheckedChange={(val) => setForm((f) => ({ ...f, isFeatured: val }))} />
                   <Label className="text-[var(--foreground)]">مميز</Label>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-[var(--border)] bg-[var(--card)]">
+            <CardHeader><CardTitle className="text-[var(--foreground)]">بيانات SEO</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-[var(--foreground)]">عنوان SEO (Meta Title)</Label>
+                <Input value={form.metaTitle} onChange={(e) => setForm((f) => ({ ...f, metaTitle: e.target.value }))} className="mt-1" placeholder="عنوان الصفحة في نتائج البحث" />
+              </div>
+              <div>
+                <Label className="text-[var(--foreground)]">وصف SEO (Meta Description)</Label>
+                <Textarea value={form.metaDescription} onChange={(e) => setForm((f) => ({ ...f, metaDescription: e.target.value }))} rows={3} className="mt-1" placeholder="وصف الصفحة في نتائج البحث" />
               </div>
             </CardContent>
           </Card>

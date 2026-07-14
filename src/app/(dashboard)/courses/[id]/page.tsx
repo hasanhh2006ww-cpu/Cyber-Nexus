@@ -8,7 +8,7 @@ import {
   ArrowLeft, Clock, CheckCircle, Play, Shield, Globe, Award,
   FileText, Video, Link as LinkIcon, Code, Image, Archive,
   FolderOpen, ExternalLink, FileDown, ChevronDown, ChevronUp,
-  Lock, LogIn, GraduationCap, Star, Users, LogOut,
+  Lock, LogIn, GraduationCap, Star, Users, LogOut, Route,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +44,7 @@ interface CourseDetail {
   xpPoints: number; certificateEnabled: boolean;
   sections: CourseSection[];
   lessons: CourseLesson[];
+  learningPaths?: Array<{ learningPath: { id: string; title: string; slug: string; description: string; difficulty: string; thumbnail: string | null } }>;
 }
 
 interface UserProgress {
@@ -310,6 +311,37 @@ export default function CourseDetailPage() {
                   <div className="flex flex-wrap gap-2">
                     {tags.map((tag) => <Badge key={tag} variant="secondary">{tag}</Badge>)}
                   </div>
+                )}
+
+                {/* Linked Learning Paths */}
+                {course.learningPaths && course.learningPaths.length > 0 && (
+                  <Card className="border-[var(--border)] bg-[var(--card)]">
+                    <CardHeader>
+                      <CardTitle className="text-[var(--foreground)] flex items-center gap-2">
+                        <Route className="h-5 w-5" /> مسارات التعلم المرتبطة
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {course.learningPaths.map(({ learningPath: lp }) => (
+                        <Link key={lp.id} href={`/learning-paths/${lp.slug}`}>
+                          <div className="flex items-center gap-4 p-4 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--secondary)] transition-colors cursor-pointer">
+                            {lp.thumbnail ? (
+                              <img src={lp.thumbnail} alt="" className="w-14 h-14 rounded-lg object-cover" />
+                            ) : (
+                              <div className="w-14 h-14 rounded-lg bg-[var(--secondary)] flex items-center justify-center">
+                                <Route className="h-6 w-6 text-[var(--primary)]" />
+                              </div>
+                            )}
+                            <div className="flex-1">
+                              <p className="font-medium text-[var(--foreground)]">{lp.title}</p>
+                              <p className="text-xs text-[var(--muted-foreground)] line-clamp-1">{lp.description}</p>
+                            </div>
+                            <Badge variant="outline">{DIFF_MAP[lp.difficulty] || lp.difficulty}</Badge>
+                          </div>
+                        </Link>
+                      ))}
+                    </CardContent>
+                  </Card>
                 )}
 
                 {/* Course Content - Sections */}

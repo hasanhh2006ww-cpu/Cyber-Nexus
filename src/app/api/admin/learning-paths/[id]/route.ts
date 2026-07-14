@@ -38,7 +38,7 @@ export async function PUT(
     const { title, slug, description, descriptionLong, thumbnail, banner, difficulty, estimatedHours, isPublished, isFeatured, sortOrder } = body;
 
     const updateData: Record<string, unknown> = {};
-    const allowed = ["title", "slug", "description", "descriptionLong", "thumbnail", "banner", "difficulty", "estimatedHours", "isPublished", "isFeatured", "sortOrder"];
+    const allowed = ["title", "slug", "description", "descriptionLong", "thumbnail", "banner", "difficulty", "estimatedHours", "isPublished", "isFeatured", "sortOrder", "metaTitle", "metaDescription"];
     for (const field of allowed) {
       if (body[field] !== undefined) updateData[field] = body[field];
     }

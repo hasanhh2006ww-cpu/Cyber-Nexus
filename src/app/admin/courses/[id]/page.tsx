@@ -6,8 +6,9 @@ import Link from "next/link"
 import { motion } from "framer-motion"
 import { ArrowLeft, Save, Eye, EyeOff } from "lucide-react"
 import { toast } from "@/components/ui/sonner"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CourseInfoForm, type CourseFormData } from "@/components/admin/course-builder/CourseInfoForm"
 import { CourseContentBuilder } from "@/components/admin/course-builder/CourseContentBuilder"
@@ -28,6 +29,10 @@ interface LessonData {
   fileUrl: string; fileType: string; externalUrl: string; codeContent: string;
   codeLanguage: string; order: number; duration: string; isPreview: boolean;
   sectionId?: string | null;
+}
+
+interface LearningPathItem {
+  id: string; title: string; slug: string;
 }
 
 const defaultCourse: CourseFormData = {
@@ -51,6 +56,8 @@ export default function AdminCourseBuilderPage() {
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState("info")
   const [showPreview, setShowPreview] = useState(false)
+  const [allLearningPaths, setAllLearningPaths] = useState<LearningPathItem[]>([])
+  const [selectedPathIds, setSelectedPathIds] = useState<Set<string>>(new Set())
 
   const isNew = courseId === "new"
 
@@ -83,6 +90,9 @@ export default function AdminCourseBuilderPage() {
       })))
 
       setOrphanLessons(data.lessons || [])
+
+      const linkedPaths = (data.learningPaths || []).map((lp: { learningPath: LearningPathItem }) => lp.learningPath.id)
+      setSelectedPathIds(new Set(linkedPaths))
     } catch (err) {
       console.error(err)
       toast.error("Failed to load course")
@@ -92,6 +102,12 @@ export default function AdminCourseBuilderPage() {
   }, [courseId, isNew, router])
 
   useEffect(() => { fetchCourse() }, [fetchCourse])
+
+  useEffect(() => {
+    fetch("/api/admin/learning-paths").then(r => r.json()).then((data) => {
+      setAllLearningPaths(data.map((p: { id: string; title: string; slug: string }) => ({ id: p.id, title: p.title, slug: p.slug })))
+    }).catch(() => {})
+  }, [])
 
   const handleSave = async () => {
     if (!course.title || !course.description || !course.category || !course.duration) {
@@ -111,6 +127,22 @@ export default function AdminCourseBuilderPage() {
       })
       if (!res.ok) throw new Error("Failed to save course")
       const saved = await res.json()
+
+      const savedId = saved.id
+      const currentRes = await fetch(`/api/admin/courses/${savedId}`)
+      const currentData = await currentRes.json()
+      const currentPathIds = new Set<string>((currentData.learningPaths || []).map((lp: { learningPath: { id: string } }) => lp.learningPath.id))
+
+      for (const pathId of selectedPathIds) {
+        if (!currentPathIds.has(pathId)) {
+          await fetch(`/api/admin/learning-paths/${pathId}/courses/${savedId}`, { method: "PUT" })
+        }
+      }
+      for (const pathId of currentPathIds) {
+        if (!selectedPathIds.has(pathId)) {
+          await fetch(`/api/admin/learning-paths/${pathId}/courses/${savedId}`, { method: "DELETE" })
+        }
+      }
 
       toast.success(isNew ? "تم إنشاء الدورة بنجاح" : "تم حفظ التغييرات")
       if (isNew) {
@@ -201,6 +233,38 @@ export default function AdminCourseBuilderPage() {
 
           <TabsContent value="info">
             <CourseInfoForm course={course} onChange={(data) => setCourse((prev) => ({ ...prev, ...data }))} />
+
+            {!isNew && allLearningPaths.length > 0 && (
+              <Card className="border-[var(--border)] bg-[var(--card)] mt-6">
+                <CardHeader>
+                  <CardTitle className="text-[var(--foreground)]">مسارات التعلم المرتبطة</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-[var(--muted-foreground)]">اختر مسارات التعلم التي تنتمي إليها هذه الدورة</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {allLearningPaths.map((lp) => (
+                      <label key={lp.id} className="flex items-center gap-3 p-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--secondary)] cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={selectedPathIds.has(lp.id)}
+                          onChange={(e) => {
+                            const next = new Set(selectedPathIds)
+                            if (e.target.checked) next.add(lp.id)
+                            else next.delete(lp.id)
+                            setSelectedPathIds(next)
+                          }}
+                          className="h-4 w-4"
+                        />
+                        <div>
+                          <span className="text-sm font-medium text-[var(--foreground)]">{lp.title}</span>
+                          <span className="text-xs text-[var(--muted-foreground)] mr-2">/{lp.slug}</span>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="content">

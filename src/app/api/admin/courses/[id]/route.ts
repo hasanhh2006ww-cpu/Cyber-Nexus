@@ -25,6 +25,13 @@ export async function GET(
           include: { quiz: true },
           where: { sectionId: null },
         },
+        learningPaths: {
+          include: {
+            learningPath: {
+              select: { id: true, title: true, slug: true },
+            },
+          },
+        },
         _count: {
           select: { reviews: true },
         },
