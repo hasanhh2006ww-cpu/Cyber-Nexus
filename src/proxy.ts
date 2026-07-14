@@ -1,11 +1,17 @@
-import { NextResponse, NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
+import NextAuth from "next-auth";
+import { NextResponse } from "next/server";
+import authConfig from "@/auth.config";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const NextAuthFn = NextAuth as any;
+const { auth } = NextAuthFn(authConfig);
 
 const protectedPaths = ["/dashboard", "/profile"];
 const authPaths = ["/login", "/register"];
 const adminPaths = ["/admin"];
 
-export default auth((req: NextRequest & { auth: { user?: { id?: string; role?: string } } | null }) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default auth((req: any) => {
   const { pathname } = req.nextUrl;
   const session = req.auth;
 
@@ -20,7 +26,7 @@ export default auth((req: NextRequest & { auth: { user?: { id?: string; role?: s
     if (!isAuthenticated) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
-    if ((session?.user as Record<string, unknown>)?.role !== "admin") {
+    if (session?.user?.role !== "admin") {
       return NextResponse.redirect(new URL("/unauthorized", req.url));
     }
   }
@@ -30,7 +36,7 @@ export default auth((req: NextRequest & { auth: { user?: { id?: string; role?: s
   }
 
   if (isAuthPath && isAuthenticated) {
-    const role = (session?.user as Record<string, unknown>)?.role;
+    const role = session?.user?.role;
     return NextResponse.redirect(
       new URL(role === "admin" ? "/admin" : "/dashboard", req.url)
     );
