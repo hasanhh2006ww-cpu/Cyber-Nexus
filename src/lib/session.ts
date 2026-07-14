@@ -22,29 +22,44 @@ async function decryptSession(
   req: NextRequest
 ): Promise<AuthUser | null> {
   try {
-    const secret = process.env.NEXTAUTH_SECRET;
-    if (!secret) return null;
+    const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+    if (!secret) {
+      console.error("[AUTH] No secret configured (checked AUTH_SECRET and NEXTAUTH_SECRET)");
+      return null;
+    }
 
-    const cookieName = "authjs.session-token";
-    const token =
-      req.cookies.get(`__Secure-${cookieName}`)?.value ||
-      req.cookies.get(cookieName)?.value;
+    // NextAuth uses the full cookie name as the HKDF salt.
+    // On HTTPS (Vercel): "__Secure-authjs.session-token"
+    // On HTTP  (local):  "authjs.session-token"
+    const secureToken = req.cookies.get("__Secure-authjs.session-token")?.value;
+    const insecureToken = req.cookies.get("authjs.session-token")?.value;
 
-    if (!token) return null;
+    let token: string | undefined;
+    let salt: string;
+    if (secureToken) {
+      token = secureToken;
+      salt = "__Secure-authjs.session-token";
+    } else if (insecureToken) {
+      token = insecureToken;
+      salt = "authjs.session-token";
+    } else {
+      console.error("[AUTH] No session cookie found");
+      return null;
+    }
 
-    const payload = await decodeToken({
-      token,
-      secret,
-      salt: "authjs.session-token",
-    });
+    const payload = await decodeToken({ token, secret, salt });
 
-    if (!payload || !payload.id) return null;
+    if (!payload || !payload.id) {
+      console.error("[AUTH] JWT decode failed or missing id claim");
+      return null;
+    }
 
     return {
       id: payload.id as string,
       role: (payload.role as string) || "student",
     };
-  } catch {
+  } catch (error) {
+    console.error("[AUTH] decryptSession error:", error);
     return null;
   }
 }
