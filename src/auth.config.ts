@@ -2,6 +2,7 @@ export default {
   trustHost: true,
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
+  providers: [],
   callbacks: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async jwt({ token, user }: any) {

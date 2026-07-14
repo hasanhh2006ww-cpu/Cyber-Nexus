@@ -1,0 +1,11 @@
+[31m[auth][error][0m MissingCSRF: CSRF token was missing during an action callback. Read more at https://errors.authjs.dev#missingcsrf
+    at V (D:\progrmming\t1\cyber-nexus\.next\server\chunks\node_modules_next_0yh1bgn._.js:1:34299)
+    at nh (D:\progrmming\t1\cyber-nexus\.next\server\chunks\node_modules_next_0yh1bgn._.js:404:51405)
+    at async ng (D:\progrmming\t1\cyber-nexus\.next\server\chunks\node_modules_next_0yh1bgn._.js:404:55979)
+    at async rJ.do (D:\progrmming\t1\cyber-nexus\node_modules\next\dist\compiled\next-server\app-route-turbo.runtime.prod.js:5:20930)
+    at async rJ.handle (D:\progrmming\t1\cyber-nexus\node_modules\next\dist\compiled\next-server\app-route-turbo.runtime.prod.js:5:25785)
+    at async u (D:\progrmming\t1\cyber-nexus\.next\server\chunks\node_modules_next_0yh1bgn._.js:404:67113)
+    at async rJ.handleResponse (D:\progrmming\t1\cyber-nexus\node_modules\next\dist\compiled\next-server\app-route-turbo.runtime.prod.js:1:119701)
+    at async s (D:\progrmming\t1\cyber-nexus\.next\server\chunks\node_modules_next_0yh1bgn._.js:404:68155)
+    at async Module.nF [as handler] (D:\progrmming\t1\cyber-nexus\.next\server\chunks\node_modules_next_0yh1bgn._.js:404:69263)
+    at async NextNodeServer.renderToResponseWithComponentsImpl (D:\progrmming\t1\cyber-nexus\node_modules\next\dist\server\base-server.js:1462:9)
