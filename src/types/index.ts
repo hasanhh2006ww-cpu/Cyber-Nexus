@@ -67,6 +67,7 @@ export interface Lesson {
   codeContent: string;
   codeLanguage: string;
   order: number;
+  thumbnail: string;
   duration: string;
   isPreview: boolean;
   courseId: string;

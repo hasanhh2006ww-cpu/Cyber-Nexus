@@ -92,6 +92,7 @@ model Lesson {
   codeContent   String    @default("")
   codeLanguage  String    @default("")
   order         Int
+  thumbnail     String    @default("")
   duration      String    @default("")
   isPreview     Boolean   @default(false)
   courseId       String

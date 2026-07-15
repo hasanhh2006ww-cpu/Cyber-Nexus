@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
-import { GripVertical, Plus, Pencil, Trash2, FileText, Video, Link, Code, Image, Archive, FolderOpen, ExternalLink, FileDown, Play } from "lucide-react"
+import { GripVertical, Plus, Pencil, Trash2, FileText, Video, Link, Code, Image, Archive, FolderOpen, ExternalLink, FileDown, Play, MonitorPlay, RefreshCw, Download } from "lucide-react"
 import { CONTENT_TYPES, type ContentType } from "@/types"
 
 interface SectionData {
@@ -77,6 +77,12 @@ export function CourseContentBuilder({ courseId, sections, orphanLessons, onUpda
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deletingType, setDeletingType] = useState<"section" | "lesson">("lesson")
   const fileRef = useRef<HTMLInputElement>(null)
+  const [ytDialogOpen, setYtDialogOpen] = useState(false)
+  const [ytPlaylistUrl, setYtPlaylistUrl] = useState("")
+  const [ytLoading, setYtLoading] = useState(false)
+  const [ytProgress, setYtProgress] = useState("")
+
+  const existingYouTubeLessons = sections.reduce((acc, s) => acc + s.lessons.filter((l) => l.contentType === "youtube").length, 0) + orphanLessons.filter((l) => l.contentType === "youtube").length
 
   const openCreateLesson = (sectionId: string | null) => {
     setEditingLesson(null)
@@ -227,13 +233,50 @@ export function CourseContentBuilder({ courseId, sections, orphanLessons, onUpda
     } catch { toast.error("Failed to reorder") }
   }
 
+  const handleYouTubeAction = async (action: "import" | "sync" | "update") => {
+    if (action !== "update" && !ytPlaylistUrl.trim()) {
+      toast.error("أدخل رابط Playlist")
+      return
+    }
+    setYtLoading(true)
+    const labels = { import: "جارٍ الاستيراد...", sync: "جارٍ المزامنة...", update: "جارٍ التحديث..." }
+    setYtProgress(labels[action])
+    try {
+      const res = await fetch("/api/admin/youtube", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, playlistUrl: ytPlaylistUrl, courseId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Operation failed")
+      if (action === "update") {
+        toast.success(`تم تحديث ${data.updated} من ${data.total} درس`)
+      } else {
+        toast.success(`تم الاستيراد: ${data.imported} جديد، ${data.data?.skipped || data.skipped} مكرر، ${data.data?.failed || data.failed} فاشل`)
+      }
+      setYtDialogOpen(false)
+      setYtPlaylistUrl("")
+      onUpdate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Operation failed")
+    } finally {
+      setYtLoading(false)
+      setYtProgress("")
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-[var(--foreground)]">محتوى الدورة</h3>
-        <Button onClick={handleAddSection} className="bg-[var(--primary)] text-[var(--primary-foreground)]">
-          <Plus className="ml-2 h-4 w-4" /> إضافة قسم
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="border-[var(--border)]" onClick={() => setYtDialogOpen(true)}>
+            <MonitorPlay className="ml-2 h-4 w-4" /> استيراد من YouTube Playlist
+          </Button>
+          <Button onClick={handleAddSection} className="bg-[var(--primary)] text-[var(--primary-foreground)]">
+            <Plus className="ml-2 h-4 w-4" /> إضافة قسم
+          </Button>
+        </div>
       </div>
 
       <DragDropContext onDragEnd={handleDragEnd}>
@@ -410,6 +453,65 @@ export function CourseContentBuilder({ courseId, sections, orphanLessons, onUpda
               <Button variant="outline" className="border-[var(--border)]">إلغاء</Button>
             </DialogClose>
             <Button variant="destructive" onClick={handleDelete}>حذف</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={ytDialogOpen} onOpenChange={(o) => { if (!ytLoading) { setYtDialogOpen(o); if (!o) { setYtPlaylistUrl(""); setYtProgress("") } } }}>
+        <DialogContent className="border-[var(--border)] bg-[var(--card)] max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-[var(--foreground)] flex items-center gap-2">
+              <MonitorPlay className="h-5 w-5" /> استيراد من YouTube Playlist
+            </DialogTitle>
+            <DialogDescription className="text-[var(--muted-foreground)]">
+              أدخل رابط قائمة التشغيل لاستيراد الفيديوهات كدروس
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-[var(--foreground)]">رابط Playlist</Label>
+              <Input
+                value={ytPlaylistUrl}
+                onChange={(e) => setYtPlaylistUrl(e.target.value)}
+                placeholder="https://www.youtube.com/playlist?list=PL..."
+                disabled={ytLoading}
+                className="border-[var(--border)] bg-[var(--background)] text-[var(--foreground)]"
+              />
+              <p className="text-xs text-[var(--muted-foreground)]">
+                يُضاف كل فيديو كدرس منفصل. يتم تخطي الفيديوهات المكررة تلقائيًا.
+              </p>
+            </div>
+            {ytLoading && ytProgress && (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-[var(--secondary)]/50 border border-[var(--border)]">
+                <div className="animate-spin h-4 w-4 border-2 border-[var(--primary)] border-t-transparent rounded-full" />
+                <span className="text-sm text-[var(--foreground)]">{ytProgress}</span>
+              </div>
+            )}
+            {existingYouTubeLessons > 0 && (
+              <div className="p-3 rounded-lg bg-[var(--secondary)]/30 border border-[var(--border)]">
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  هذه الدورة تحتوي على {existingYouTubeLessons} درس YouTube موجود بالفعل.
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <DialogClose asChild>
+              <Button variant="outline" className="border-[var(--border)]" disabled={ytLoading}>إلغاء</Button>
+            </DialogClose>
+            {existingYouTubeLessons > 0 && (
+              <Button variant="outline" className="border-[var(--border)]" disabled={ytLoading} onClick={() => handleYouTubeAction("update")}>
+                <RefreshCw className="ml-2 h-4 w-4" /> تحديث بيانات الفيديوهات
+              </Button>
+            )}
+            {existingYouTubeLessons > 0 && (
+              <Button variant="outline" className="border-[var(--border)]" disabled={ytLoading || !ytPlaylistUrl.trim()} onClick={() => handleYouTubeAction("sync")}>
+                <Download className="ml-2 h-4 w-4" /> مزامنة Playlist
+              </Button>
+            )}
+            <Button className="bg-[var(--primary)] text-[var(--primary-foreground)]" disabled={ytLoading || !ytPlaylistUrl.trim()} onClick={() => handleYouTubeAction("import")}>
+              <MonitorPlay className="ml-2 h-4 w-4" /> استيراد
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
