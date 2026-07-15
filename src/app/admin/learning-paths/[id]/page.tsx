@@ -19,6 +19,7 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose,
 } from "@/components/ui/dialog"
+import { ImageUpload } from "@/components/admin/ImageUpload"
 
 interface Course {
   id: string; title: string; category: string; difficulty: string; isPublished: boolean;
@@ -264,14 +265,8 @@ export default function AdminLearningPathEditPage() {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-[var(--foreground)]">رابط الصورة المصغرة</Label>
-                  <Input value={form.thumbnail} onChange={(e) => setForm((f) => ({ ...f, thumbnail: e.target.value }))} className="mt-1" />
-                </div>
-                <div>
-                  <Label className="text-[var(--foreground)]">رابط البانر</Label>
-                  <Input value={form.banner} onChange={(e) => setForm((f) => ({ ...f, banner: e.target.value }))} className="mt-1" />
-                </div>
+                <ImageUpload label="صورة مصغرة" value={form.thumbnail} onChange={(url) => setForm((f) => ({ ...f, thumbnail: url }))} />
+                <ImageUpload label="صورة غلاف" value={form.banner} onChange={(url) => setForm((f) => ({ ...f, banner: url }))} />
               </div>
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">

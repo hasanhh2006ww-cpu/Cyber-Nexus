@@ -298,10 +298,12 @@ export default function LearningPathDetailPage() {
                     </div>
                     <Separator className="bg-[var(--border)]" />
 
-                    {/* Certificate */}
-                    <div className="flex items-center gap-2 text-[var(--success)] text-sm">
-                      <Award className="h-4 w-4" /> شهادة إتمام المسار عند الانتهاء
-                    </div>
+                    {/* Certificate — disabled */}
+                    {false && (
+                      <div className="flex items-center gap-2 text-[var(--success)] text-sm">
+                        <Award className="h-4 w-4" /> شهادة إتمام المسار عند الانتهاء
+                      </div>
+                    )}
 
                     {/* Action Button */}
                     {isPathComplete ? (
@@ -309,9 +311,11 @@ export default function LearningPathDetailPage() {
                         <Button className="w-full bg-[var(--success)] text-white" disabled>
                           <CheckCircle className="ml-2 h-4 w-4" /> تم إكمال المسار
                         </Button>
-                        <Button className="w-full" variant="outline">
-                          <Download className="ml-2 h-4 w-4" /> تحميل الشهادة
-                        </Button>
+                        {false && (
+                          <Button className="w-full" variant="outline">
+                            <Download className="ml-2 h-4 w-4" /> تحميل الشهادة
+                          </Button>
+                        )}
                       </div>
                     ) : (
                       <Link href={path.courses[0] ? `/courses/${path.courses[0].course.id}` : "/learning-paths"}>

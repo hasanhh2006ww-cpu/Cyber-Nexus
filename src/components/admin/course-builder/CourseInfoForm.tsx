@@ -1,6 +1,5 @@
 "use client"
 
-import { useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,9 +8,9 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "@/components/ui/sonner"
-import { Upload, X, Plus } from "lucide-react"
+import { X, Plus } from "lucide-react"
 import { useState } from "react"
+import { ImageUpload } from "@/components/admin/ImageUpload"
 
 export interface CourseFormData {
   title: string
@@ -40,65 +39,6 @@ export interface CourseFormData {
 interface CourseInfoFormProps {
   course: CourseFormData
   onChange: (data: Partial<CourseFormData>) => void
-}
-
-async function uploadFile(file: File): Promise<string | null> {
-  const formData = new FormData()
-  formData.append("file", file)
-  try {
-    const res = await fetch("/api/upload", { method: "POST", body: formData })
-    if (!res.ok) throw new Error("Upload failed")
-    const data = await res.json()
-    return data.url
-  } catch {
-    toast.error("فشل رفع الملف")
-    return null
-  }
-}
-
-function ImageUpload({ label, value, onChange }: { label: string; value: string; onChange: (url: string) => void }) {
-  const ref = useRef<HTMLInputElement>(null)
-  const [uploading, setUploading] = useState(false)
-
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    const url = await uploadFile(file)
-    if (url) onChange(url)
-    setUploading(false)
-    if (ref.current) ref.current.value = ""
-  }
-
-  return (
-    <div className="space-y-2">
-      <Label className="text-[var(--foreground)]">{label}</Label>
-      {value && (
-        <div className="relative mb-2">
-          <img src={value} alt={label} className="h-32 w-full rounded-lg object-cover border border-[var(--border)]" />
-          <Button
-            variant="destructive"
-            size="sm"
-            className="absolute top-2 right-2 h-6 w-6 p-0"
-            onClick={() => onChange("")}
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        </div>
-      )}
-      <input ref={ref} type="file" accept="image/*" className="hidden" onChange={handleFile} />
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full border-[var(--border)]"
-        onClick={() => ref.current?.click()}
-        disabled={uploading}
-      >
-        <Upload className="ml-2 h-4 w-4" />
-        {uploading ? "جارٍ الرفع..." : "رفع صورة"}
-      </Button>
-    </div>
-  )
 }
 
 export function CourseInfoForm({ course, onChange }: CourseInfoFormProps) {
