@@ -1,18 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import {
   Shield,
   BookOpen,
-  Award,
   Users,
   ArrowRight,
-  CheckCircle,
   Zap,
-  Lock,
   Terminal,
+  Route,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,34 +25,37 @@ const features = [
       "دورات منهجية صممتها متخصصو الأمن السيبراني تغطي المواضيع الأساسية.",
   },
   {
-    icon: CheckCircle,
-    title: "اختبارات تفاعلية",
-    description:
-      "اختبر معلوماتك باختبارات بعد كل درس لتعزيز تعلمك.",
-  },
-  {
     icon: Zap,
     title: "تتبع التقدم",
     description:
       "تابع رحلة تعلمك مع تتبع مفصل للتقدم والتحليلات.",
   },
-  {
-    icon: Lock,
-    title: "تعلم عملي",
-    description:
-      "تمارين عملية وسيناريوهات واقعية لبناء مهاراتك.",
-  },
 ];
 
-const stats = [
-  { label: "الدورات", value: "10+" },
-  { label: "الدروس", value: "40+" },
-  { label: "الاختبارات", value: "40+" },
-  { label: "الطلاب", value: "1000+" },
-];
+interface Stats {
+  students: number;
+  courses: number;
+  lessons: number;
+  learningPaths: number;
+}
 
 export default function HomePage() {
   const { data: session } = useSession();
+  const [stats, setStats] = useState<Stats>({ students: 0, courses: 0, lessons: 0, learningPaths: 0 });
+
+  useEffect(() => {
+    fetch("/api/stats")
+      .then((r) => r.json())
+      .then((data: Stats) => setStats(data))
+      .catch(() => {});
+  }, []);
+
+  const statItems = [
+    { label: "الطلاب", value: stats.students },
+    { label: "الدورات", value: stats.courses },
+    { label: "الدروس", value: stats.lessons },
+    { label: "المسارات التعليمية", value: stats.learningPaths },
+  ];
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -81,7 +83,7 @@ export default function HomePage() {
 
           <p className="mx-auto mb-10 max-w-2xl text-lg text-[var(--muted-foreground)] sm:text-xl">
             منصتك الشاملة لتعلم الأمن السيبراني. تعلم القرصنة الأخلاقية
-            وأمن الشبكات والتشفير والمزيد مع دورات منهجية وتمارين عملية.
+            وأمن الشبكات والتشفير والمزيد مع دورات منهجية.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -115,7 +117,7 @@ export default function HomePage() {
       <section className="border-y border-[var(--border)] bg-[var(--card)]/50 py-12">
         <div className="mx-auto max-w-7xl px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {stats.map((stat, i) => (
+            {statItems.map((stat, i) => (
               <motion.div
                 key={stat.label}
                 initial={{ opacity: 0, y: 20 }}
@@ -153,7 +155,7 @@ export default function HomePage() {
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
             {features.map((feature, i) => (
               <motion.div
                 key={feature.title}
@@ -189,10 +191,17 @@ export default function HomePage() {
                 انضم إلى آلاف الطلاب في بناء مسيرتهم في الأمن السيبراني.
                 ابدأ رحلة تعلمك اليوم.
               </p>
-              {!session && (
+              {session ? (
+                <Link href="/dashboard">
+                  <Button size="lg" className="text-base px-8">
+                    الذهاب للوحة التحكم
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+              ) : (
                 <Link href="/register">
                   <Button size="lg" className="text-base px-8">
-                    إنشاء حساب مجاني
+                    ابدأ الآن
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>

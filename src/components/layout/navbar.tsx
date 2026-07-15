@@ -31,6 +31,12 @@ export function Navbar() {
             >
               الدورات
             </Link>
+            <Link
+              href="/learning-paths"
+              className="text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
+            >
+              المسارات التعليمية
+            </Link>
             {session && (
               <Link
                 href="/dashboard"
