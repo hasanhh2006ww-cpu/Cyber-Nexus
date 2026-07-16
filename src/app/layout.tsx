@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
@@ -12,6 +12,7 @@ const cairo = localFont({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://cyber-nexus-one.vercel.app"),
   title: "Cyber Nexus - منصة تعلم الأمن السيبراني",
   description:
     "منصة شاملة لتعلم الأمن السيبراني لطلاب الجامعات والمبتدئين. تعلم القرصنة الأخلاقية وأمن الشبكات والتشفير والمزيد.",
@@ -24,6 +25,15 @@ export const metadata: Metadata = {
     "تحديات أمنية",
     "دورات أمنية",
   ],
+  icons: {
+    icon: "/icon",
+    shortcut: "/icon",
+    apple: "/apple-icon",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0F172A",
 };
 
 export default function RootLayout({
